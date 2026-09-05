@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars and point to an existing public key.
+ssh_public_key_path = "/home/example/.ssh/id_ed25519.pub"
+
+# Optional host-specific overrides:
+# libvirt_uri = "qemu:///system"
+# storage_pool = "default"
