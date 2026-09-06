@@ -1,11 +1,12 @@
 PROFILE ?= colocated
 SCENARIO ?= primary-service-loss
 TRIAL ?= 1
+MODE ?= async
 TERRAFORM ?= terraform
 TF_DIR := terraform/environments/$(PROFILE)
 VALID_PROFILES := full colocated
 
-.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean etcd-configure etcd-verify etcd-quorum-test etcd-clean patroni-configure patroni-verify haproxy-configure haproxy-verify patroni-failover-test failure-baseline failure-scenario failure-matrix failure-report failure-clean
+.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean etcd-configure etcd-verify etcd-quorum-test etcd-clean patroni-configure patroni-verify haproxy-configure haproxy-verify patroni-failover-test failure-baseline failure-scenario failure-matrix failure-report failure-clean durability-set durability-verify durability-latency durability-failure-test durability-standby-loss durability-strict-test durability-matrix durability-report durability-clean
 
 tf-fmt:
 	$(TERRAFORM) fmt -recursive terraform
@@ -82,3 +83,30 @@ failure-report:
 
 failure-clean:
 	rm -rf .pgsentry/results/m5
+
+durability-set: check-profile
+	./scripts/durability/policy.sh $(PROFILE) $(MODE)
+
+durability-verify: check-profile
+	./scripts/durability/verify.sh $(PROFILE) $(MODE)
+
+durability-latency: check-profile
+	./scripts/durability/latency.sh $(PROFILE) $(MODE)
+
+durability-failure-test: check-profile
+	./scripts/durability/scenario.sh $(PROFILE) $(MODE) primary-vm-loss $(TRIAL)
+
+durability-standby-loss: check-profile
+	./scripts/durability/scenario.sh $(PROFILE) sync synchronous-standby-loss $(TRIAL)
+
+durability-strict-test: check-profile
+	./scripts/durability/scenario.sh $(PROFILE) sync-strict no-synchronous-standby $(TRIAL)
+
+durability-matrix: check-profile
+	./scripts/durability/run-matrix.sh $(PROFILE)
+
+durability-report:
+	python3 scripts/durability/report.py .pgsentry/results/m6
+
+durability-clean:
+	rm -rf .pgsentry/results/m6
