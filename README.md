@@ -6,13 +6,13 @@ It is an evidence-producing reliability lab, not a generic PostgreSQL deployment
 
 ## Status and roadmap
 
-M1 provides the VM and network infrastructure. M2 adds PostgreSQL 16 native physical streaming replication and an explicit manual-failover exercise; later orchestration remains intentionally absent.
+M1 provides the VM and network infrastructure. M2 adds PostgreSQL 16 native physical streaming replication and manual failover. M3 adds a separate TLS-protected three-member etcd cluster and proves its quorum behavior; Patroni remains intentionally absent.
 
 | Milestone | Capability | Status |
 | --- | --- | --- |
 | M1 | Terraform infrastructure | Implemented and verified |
 | M2 | Manual PostgreSQL streaming replication | Implemented; canonical runtime verified |
-| M3 | etcd quorum | Planned |
+| M3 | etcd quorum | Implemented; canonical runtime verification required |
 | M4 | Patroni HA and HAProxy routing | Planned |
 | M5 | Automated failover harness | Planned |
 | M6 | Synchronous durability experiments | Planned |
@@ -71,3 +71,15 @@ make cluster-down PROFILE=full
 Set `PGSENTRY_SSH_KEY` if the private key is not `~/.ssh/id_ed25519`. The replication password is generated at runtime under ignored `.pgsentry/`, is never committed, and is removed by `cluster-down` or `make pg-clean`.
 
 `pg-verify` is non-destructive to cluster roles: it verifies roles, both streaming connections, replicated data, standby write protection, and restart/reconnect behavior. `pg-failover` is deliberately separate and clearly destructive. See [the M2 runbook](docs/m2-postgresql.md) for inspection commands and split-brain precautions.
+
+## M3 quick start
+
+M3 pins etcd and etcdctl v3.7.1 and generates runtime-only TLS credentials. On a provisioned profile:
+
+```bash
+make etcd-configure PROFILE=full
+make etcd-verify PROFILE=full
+make etcd-quorum-test PROFILE=full # destructive but self-restoring
+```
+
+The quorum test dynamically stops the elected leader, proves two-member availability, demonstrates one-member quorum loss with bounded operations, restores the members, and verifies persistence across a controlled full service restart. See [the M3 runbook](docs/m3-etcd.md).
