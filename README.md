@@ -6,7 +6,7 @@ It is an evidence-producing reliability lab, not a generic PostgreSQL deployment
 
 ## Status and roadmap
 
-M1 provides VM infrastructure, M2 demonstrates manual PostgreSQL replication, and M3 proves independent etcd quorum. M4 integrates Patroni-managed PostgreSQL with the TLS etcd DCS and HAProxy primary routing.
+M1 provides VM infrastructure, M2 demonstrates manual PostgreSQL replication, M3 proves independent etcd quorum, and M4 integrates Patroni-managed PostgreSQL with HAProxy. M5 adds repeatable client-visible failure experiments.
 
 | Milestone | Capability | Status |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ M1 provides VM infrastructure, M2 demonstrates manual PostgreSQL replication, an
 | M2 | Manual PostgreSQL streaming replication | Implemented; canonical runtime verified |
 | M3 | etcd quorum | Implemented and verified |
 | M4 | Patroni HA and HAProxy routing | Implemented and verified |
-| M5 | Automated failover harness | Planned |
+| M5 | Automated failure and durability harness | Implemented and verified |
 | M6 | Synchronous durability experiments | Planned |
 | M7 | Network-partition and DCS chaos | Planned |
 | M8 | pgsafe migration safety CLI | Planned |
@@ -98,3 +98,16 @@ make patroni-failover-test PROFILE=full # destructive, self-restoring
 ```
 
 Patroni owns PostgreSQL once M4 is configured; do not run the M2 `pg-*` configuration targets on the same live data directories. See [the M4 runbook](docs/m4-patroni-haproxy.md).
+
+## M5 quick start
+
+After the full M4 stack passes verification:
+
+```bash
+make failure-baseline PROFILE=full
+make failure-scenario PROFILE=full SCENARIO=primary-service-loss
+make failure-matrix PROFILE=full
+make failure-report
+```
+
+The destructive scenarios are individually named, restore their failure state, and store machine-readable evidence under ignored `.pgsentry/results/m5/`. See [the M5 runbook](docs/m5-failure-testing.md).
