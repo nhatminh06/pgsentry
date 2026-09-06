@@ -20,9 +20,9 @@ load_profile() {
   ETCD_ENDPOINTS="https://${ETCD_IPS[0]}:2379,https://${ETCD_IPS[1]}:2379,https://${ETCD_IPS[2]}:2379"
 }
 
-ssh_node() { ssh -i "$PGSENTRY_SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$PGSENTRY_RUNTIME/known_hosts" "$PGSENTRY_SSH_USER@$1" "${@:2}"; }
+ssh_node() { ssh -F /dev/null -i "$PGSENTRY_SSH_KEY" -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$PGSENTRY_RUNTIME/known_hosts" "$PGSENTRY_SSH_USER@$1" "${@:2}"; }
 wait_for_ssh() { for _ in $(seq 1 30); do ssh_node "$1" true 2>/dev/null && return; sleep 5; done; echo "SSH unavailable: $1" >&2; return 1; }
-run_remote_script() { local ip=$1 script=$2; shift 2; ssh -i "$PGSENTRY_SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$PGSENTRY_RUNTIME/known_hosts" "$PGSENTRY_SSH_USER@$ip" "bash -s -- $*" <"$script"; }
+run_remote_script() { local ip=$1 script=$2; shift 2; ssh -F /dev/null -i "$PGSENTRY_SSH_KEY" -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$PGSENTRY_RUNTIME/known_hosts" "$PGSENTRY_SSH_USER@$ip" "bash -s -- $*" <"$script"; }
 copy_remote() { local ip=$1 src=$2 dest=$3 mode=$4 encoded; encoded=$(base64 -w0 "$src"); ssh_node "$ip" "printf %s '$encoded' | base64 -d | sudo tee '$dest' >/dev/null; sudo chmod '$mode' '$dest'"; }
 etcdctl_cmd() { "$ETCD_RUNTIME/etcdctl" --endpoints="${PGSENTRY_ETCD_ENDPOINTS:-$ETCD_ENDPOINTS}" --cacert="$ETCD_RUNTIME/pki/ca.crt" --cert="$ETCD_RUNTIME/pki/admin.crt" --key="$ETCD_RUNTIME/pki/admin.key" --dial-timeout=3s --command-timeout=5s "$@"; }
 healthy_count() { etcdctl_cmd endpoint health 2>&1 | grep -c 'is healthy' || true; }

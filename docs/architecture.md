@@ -52,3 +52,9 @@ The colocated development profile maps the logical members to `node-01`, `node-0
 M4 places Patroni above PostgreSQL on the three `pg-*` nodes. Patroni uses a dedicated client certificate to coordinate through the M3 etcd cluster. The native PostgreSQL systemd service is masked: systemd owns Patroni, and Patroni exclusively owns PostgreSQL. HAProxy on `control-01` exposes port 5000 and uses each Patroni REST `/primary` endpoint on port 8008 to admit exactly one writable backend.
 
 HAProxy changes routing for new TCP connections after a role change. Existing PostgreSQL sessions cannot migrate and applications still require reconnect/retry behavior. M4 tests one controlled primary loss and one etcd-member loss, not the broader failure matrix reserved for M5.
+
+## M5 reliability harness boundary
+
+M5 adds a host-side continuous client, scenario-specific fault injection, direct role observation, structured JSON results, and generated comparison reports. Normal writes always use `control-01:5000`; direct node access is reserved for assertions and recovery. Each experiment gates on and restores the healthy M4 topology before another begins.
+
+The targeted DCS experiment blocks only the current database leader's etcd client traffic. The harness samples every PostgreSQL role and treats more than one writable primary as a safety failure. HAProxy loss is measured separately because the single routing node remains a client-access SPOF even while the database tier is healthy.

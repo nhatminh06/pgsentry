@@ -1,9 +1,11 @@
 PROFILE ?= colocated
+SCENARIO ?= primary-service-loss
+TRIAL ?= 1
 TERRAFORM ?= terraform
 TF_DIR := terraform/environments/$(PROFILE)
 VALID_PROFILES := full colocated
 
-.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean etcd-configure etcd-verify etcd-quorum-test etcd-clean patroni-configure patroni-verify haproxy-configure haproxy-verify patroni-failover-test
+.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean etcd-configure etcd-verify etcd-quorum-test etcd-clean patroni-configure patroni-verify haproxy-configure haproxy-verify patroni-failover-test failure-baseline failure-scenario failure-matrix failure-report failure-clean
 
 tf-fmt:
 	$(TERRAFORM) fmt -recursive terraform
@@ -65,3 +67,18 @@ haproxy-verify: check-profile
 
 patroni-failover-test: check-profile
 	./scripts/ha/failover-test.sh $(PROFILE)
+
+failure-baseline: check-profile
+	./scripts/failures/baseline.sh $(PROFILE)
+
+failure-scenario: check-profile
+	./scripts/failures/scenario.sh $(PROFILE) $(SCENARIO) $(TRIAL)
+
+failure-matrix: check-profile
+	./scripts/failures/run-matrix.sh $(PROFILE)
+
+failure-report:
+	python3 scripts/failures/report.py .pgsentry/results/m5
+
+failure-clean:
+	rm -rf .pgsentry/results/m5
