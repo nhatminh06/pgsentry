@@ -4,4 +4,4 @@ The environments use the `dmacvicar/libvirt` provider against a local system lib
 
 Copy an example to `terraform.tfvars`, set a real SSH public-key path, and use the root Makefile. The `full` environment is the canonical seven-node evidence environment; `colocated` is development-only.
 
-Terraform owns only networks, disks, and VMs. PostgreSQL and etcd guest configuration is intentionally performed afterward by the root Makefile's `pg-*` and `etcd-*` targets; see `docs/m2-postgresql.md` and `docs/m3-etcd.md`.
+Terraform owns only networks, disks, and VMs. PostgreSQL, etcd, Patroni, and HAProxy guest configuration is intentionally performed afterward by root Makefile targets; see the milestone runbooks under `docs/`.

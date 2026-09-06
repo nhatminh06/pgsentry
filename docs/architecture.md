@@ -46,3 +46,9 @@ M2 uses native asynchronous physical streaming replication. It deliberately does
 M3 configures `etcd-01`, `etcd-02`, and `etcd-03` as an independent three-voter Raft cluster. Client traffic on TCP 2379 and peer traffic on TCP 2380 use mutual TLS. PostgreSQL does not consume the cluster yet. Terraform continues to own only VMs, disks, and networks; SSH-driven scripts own runtime PKI and guest services.
 
 The colocated development profile maps the logical members to `node-01`, `node-02`, and `node-03`. Canonical evidence uses the separated full-profile addresses `192.168.130.21` through `.23`.
+
+## M4 integrated HA boundary
+
+M4 places Patroni above PostgreSQL on the three `pg-*` nodes. Patroni uses a dedicated client certificate to coordinate through the M3 etcd cluster. The native PostgreSQL systemd service is masked: systemd owns Patroni, and Patroni exclusively owns PostgreSQL. HAProxy on `control-01` exposes port 5000 and uses each Patroni REST `/primary` endpoint on port 8008 to admit exactly one writable backend.
+
+HAProxy changes routing for new TCP connections after a role change. Existing PostgreSQL sessions cannot migrate and applications still require reconnect/retry behavior. M4 tests one controlled primary loss and one etcd-member loss, not the broader failure matrix reserved for M5.

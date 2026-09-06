@@ -6,14 +6,14 @@ It is an evidence-producing reliability lab, not a generic PostgreSQL deployment
 
 ## Status and roadmap
 
-M1 provides the VM and network infrastructure. M2 adds PostgreSQL 16 native physical streaming replication and manual failover. M3 adds a separate TLS-protected three-member etcd cluster and proves its quorum behavior; Patroni remains intentionally absent.
+M1 provides VM infrastructure, M2 demonstrates manual PostgreSQL replication, and M3 proves independent etcd quorum. M4 integrates Patroni-managed PostgreSQL with the TLS etcd DCS and HAProxy primary routing.
 
 | Milestone | Capability | Status |
 | --- | --- | --- |
 | M1 | Terraform infrastructure | Implemented and verified |
 | M2 | Manual PostgreSQL streaming replication | Implemented; canonical runtime verified |
-| M3 | etcd quorum | Implemented; canonical runtime verification required |
-| M4 | Patroni HA and HAProxy routing | Planned |
+| M3 | etcd quorum | Implemented and verified |
+| M4 | Patroni HA and HAProxy routing | Implemented and verified |
 | M5 | Automated failover harness | Planned |
 | M6 | Synchronous durability experiments | Planned |
 | M7 | Network-partition and DCS chaos | Planned |
@@ -83,3 +83,18 @@ make etcd-quorum-test PROFILE=full # destructive but self-restoring
 ```
 
 The quorum test dynamically stops the elected leader, proves two-member availability, demonstrates one-member quorum loss with bounded operations, restores the members, and verifies persistence across a controlled full service restart. See [the M3 runbook](docs/m3-etcd.md).
+
+## M4 quick start
+
+On a fresh environment, configure etcd first, then Patroni and HAProxy:
+
+```bash
+make etcd-configure PROFILE=full
+make patroni-configure PROFILE=full
+make patroni-verify PROFILE=full
+make haproxy-configure PROFILE=full
+make haproxy-verify PROFILE=full
+make patroni-failover-test PROFILE=full # destructive, self-restoring
+```
+
+Patroni owns PostgreSQL once M4 is configured; do not run the M2 `pg-*` configuration targets on the same live data directories. See [the M4 runbook](docs/m4-patroni-haproxy.md).
