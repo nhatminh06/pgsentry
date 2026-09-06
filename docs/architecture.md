@@ -40,3 +40,9 @@ This is future architecture, not M1 functionality. No CI workflows or later mile
 The canonical M2 cluster uses PostgreSQL only on `pg-01`, `pg-02`, and `pg-03`. The etcd and control VMs remain service-free in this milestone. The development `colocated` profile can run the same logical PostgreSQL cluster on `node-01`, `node-02`, and `node-03`, but only the full profile provides canonical evidence.
 
 M2 uses native asynchronous physical streaming replication. It deliberately does not introduce etcd, Patroni, HAProxy, automatic failover, or client routing. Guest configuration is applied after Terraform over SSH so infrastructure lifecycle and PostgreSQL lifecycle remain separate.
+
+## M3 etcd boundary
+
+M3 configures `etcd-01`, `etcd-02`, and `etcd-03` as an independent three-voter Raft cluster. Client traffic on TCP 2379 and peer traffic on TCP 2380 use mutual TLS. PostgreSQL does not consume the cluster yet. Terraform continues to own only VMs, disks, and networks; SSH-driven scripts own runtime PKI and guest services.
+
+The colocated development profile maps the logical members to `node-01`, `node-02`, and `node-03`. Canonical evidence uses the separated full-profile addresses `192.168.130.21` through `.23`.
