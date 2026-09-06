@@ -58,3 +58,9 @@ HAProxy changes routing for new TCP connections after a role change. Existing Po
 M5 adds a host-side continuous client, scenario-specific fault injection, direct role observation, structured JSON results, and generated comparison reports. Normal writes always use `control-01:5000`; direct node access is reserved for assertions and recovery. Each experiment gates on and restores the healthy M4 topology before another begins.
 
 The targeted DCS experiment blocks only the current database leader's etcd client traffic. The harness samples every PostgreSQL role and treats more than one writable primary as a safety failure. HAProxy loss is measured separately because the single routing node remains a client-access SPOF even while the database tier is healthy.
+
+## M6 synchronous durability boundary
+
+M6 leaves the seven-VM topology and stable HAProxy client path unchanged. It changes Patroni's dynamic cluster configuration among `async`, `sync`, and `sync-strict`, while Patroni remains the sole owner of `synchronous_standby_names` and synchronous failover eligibility. PostgreSQL uses `synchronous_commit=on`: a synchronous acknowledgement waits for the selected standby to flush WAL, not replay it.
+
+The same M5 sequenced workload measures healthy commit latency, failure interruption, ambiguous outcomes, and retained acknowledged rows. Non-strict synchronous mode may favor availability when no eligible synchronous standby exists; strict mode preserves the synchronous requirement and can therefore block writes. M6 is controlled evidence, not a universal zero-RPO guarantee.

@@ -6,7 +6,7 @@ It is an evidence-producing reliability lab, not a generic PostgreSQL deployment
 
 ## Status and roadmap
 
-M1 provides VM infrastructure, M2 demonstrates manual PostgreSQL replication, M3 proves independent etcd quorum, and M4 integrates Patroni-managed PostgreSQL with HAProxy. M5 adds repeatable client-visible failure experiments.
+M1 provides VM infrastructure, M2 demonstrates manual PostgreSQL replication, M3 proves independent etcd quorum, M4 integrates Patroni-managed PostgreSQL with HAProxy, and M5 adds repeatable client-visible failure experiments. M6 compares asynchronous and synchronous durability policies.
 
 | Milestone | Capability | Status |
 | --- | --- | --- |
@@ -15,7 +15,7 @@ M1 provides VM infrastructure, M2 demonstrates manual PostgreSQL replication, M3
 | M3 | etcd quorum | Implemented and verified |
 | M4 | Patroni HA and HAProxy routing | Implemented and verified |
 | M5 | Automated failure and durability harness | Implemented and verified |
-| M6 | Synchronous durability experiments | Planned |
+| M6 | Synchronous durability experiments | Implemented and verified |
 | M7 | Network-partition and DCS chaos | Planned |
 | M8 | pgsafe migration safety CLI | Planned |
 | M9 | Backup, WAL, and PITR verification | Planned |
@@ -111,3 +111,17 @@ make failure-report
 ```
 
 The destructive scenarios are individually named, restore their failure state, and store machine-readable evidence under ignored `.pgsentry/results/m5/`. See [the M5 runbook](docs/m5-failure-testing.md).
+
+## M6 quick start
+
+M6 reuses the M5 client and failure analysis while changing Patroni's cluster-wide durability policy:
+
+```bash
+make durability-set PROFILE=full MODE=sync
+make durability-verify PROFILE=full MODE=sync
+make durability-latency PROFILE=full MODE=sync
+make durability-failure-test PROFILE=full MODE=sync TRIAL=1 # destructive, self-restoring
+make durability-report
+```
+
+The default after experiments is restored to `async`. Strict mode deliberately blocks bounded client writes when no synchronous standby exists. See [the M6 runbook](docs/m6-synchronous-durability.md).
