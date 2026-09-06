@@ -1,4 +1,4 @@
-# M1 architecture
+# pgsentry architecture
 
 ## Topology boundaries
 
@@ -35,3 +35,8 @@ Self-hosted reliability CI with real VM access
 
 This is future architecture, not M1 functionality. No CI workflows or later milestone tools are implemented here.
 
+## M2 PostgreSQL boundary
+
+The canonical M2 cluster uses PostgreSQL only on `pg-01`, `pg-02`, and `pg-03`. The etcd and control VMs remain service-free in this milestone. The development `colocated` profile can run the same logical PostgreSQL cluster on `node-01`, `node-02`, and `node-03`, but only the full profile provides canonical evidence.
+
+M2 uses native asynchronous physical streaming replication. It deliberately does not introduce etcd, Patroni, HAProxy, automatic failover, or client routing. Guest configuration is applied after Terraform over SSH so infrastructure lifecycle and PostgreSQL lifecycle remain separate.

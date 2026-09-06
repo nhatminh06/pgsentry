@@ -3,7 +3,7 @@ TERRAFORM ?= terraform
 TF_DIR := terraform/environments/$(PROFILE)
 VALID_PROFILES := full colocated
 
-.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile
+.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean
 
 tf-fmt:
 	$(TERRAFORM) fmt -recursive terraform
@@ -25,3 +25,16 @@ cluster-up: check-profile
 
 cluster-down: check-profile
 	$(TERRAFORM) -chdir=$(TF_DIR) destroy
+	@rm -rf .pgsentry
+
+pg-configure: check-profile
+	./scripts/postgres/configure.sh $(PROFILE)
+
+pg-verify: check-profile
+	./scripts/postgres/verify.sh $(PROFILE)
+
+pg-failover: check-profile
+	./scripts/postgres/failover.sh $(PROFILE)
+
+pg-clean:
+	rm -rf .pgsentry
