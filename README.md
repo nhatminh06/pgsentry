@@ -6,12 +6,12 @@ It is an evidence-producing reliability lab, not a generic PostgreSQL deployment
 
 ## Status and roadmap
 
-M1 implements only the VM and network infrastructure. PostgreSQL and the reliability experiments are planned, not yet implemented.
+M1 provides the VM and network infrastructure. M2 adds PostgreSQL 16 native physical streaming replication and an explicit manual-failover exercise; later orchestration remains intentionally absent.
 
 | Milestone | Capability | Status |
 | --- | --- | --- |
-| M1 | Terraform infrastructure | Implemented; provisioning evidence pending |
-| M2 | Manual PostgreSQL streaming replication | Planned |
+| M1 | Terraform infrastructure | Implemented and verified |
+| M2 | Manual PostgreSQL streaming replication | Implemented; canonical runtime verified |
 | M3 | etcd quorum | Planned |
 | M4 | Patroni HA and HAProxy routing | Planned |
 | M5 | Automated failover harness | Planned |
@@ -39,7 +39,7 @@ See [the architecture](docs/architecture.md) for the separation and network rati
 
 The provider downloads the configured Ubuntu cloud image during the first apply. No credentials or private keys belong in Terraform variables or state.
 
-## M1 quick start
+## Infrastructure quick start
 
 ```bash
 cp terraform/environments/colocated/terraform.tfvars.example \
@@ -56,3 +56,18 @@ make cluster-down PROFILE=colocated
 
 Use `PROFILE=full` only on a host sized for all seven canonical VMs. Terraform state and local variable files are ignored by Git.
 
+## M2 quick start
+
+M2 uses Ubuntu 24.04's PostgreSQL 16 packages. Configuration is performed over SSH after Terraform finishes, keeping guest service configuration out of the infrastructure modules. For canonical evidence:
+
+```bash
+make cluster-up PROFILE=full
+make pg-configure PROFILE=full
+make pg-verify PROFILE=full
+make pg-failover PROFILE=full   # destructive: stops pg-01 and promotes pg-02
+make cluster-down PROFILE=full
+```
+
+Set `PGSENTRY_SSH_KEY` if the private key is not `~/.ssh/id_ed25519`. The replication password is generated at runtime under ignored `.pgsentry/`, is never committed, and is removed by `cluster-down` or `make pg-clean`.
+
+`pg-verify` is non-destructive to cluster roles: it verifies roles, both streaming connections, replicated data, standby write protection, and restart/reconnect behavior. `pg-failover` is deliberately separate and clearly destructive. See [the M2 runbook](docs/m2-postgresql.md) for inspection commands and split-brain precautions.
