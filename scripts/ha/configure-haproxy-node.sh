@@ -15,6 +15,10 @@ defaults
   timeout connect 5s
   timeout client 30s
   timeout server 30s
+frontend prometheus
+  bind 127.0.0.1:8405
+  mode http
+  http-request use-service prometheus-exporter
 frontend postgres_write
   bind *:5000
   default_backend patroni_primary

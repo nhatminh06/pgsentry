@@ -1,0 +1,12 @@
+{
+  "annotations":{"list":[]},"editable":false,"id":null,"schemaVersion":41,"tags":["pgsentry","postgresql"],"timezone":"utc","title":"PgSentry PostgreSQL","uid":"pgsentry-postgresql","version":1,"time":{"from":"now-1h","to":"now"},"panels":[
+    {"type":"stat","title":"Primary count","id":1,"gridPos":{"h":4,"w":6,"x":0,"y":0},"targets":[{"expr":"pgsentry_postgresql_primary_count","refId":"A"}]},
+    {"type":"stat","title":"Replica count","id":2,"gridPos":{"h":4,"w":6,"x":6,"y":0},"targets":[{"expr":"pgsentry_postgresql_replica_count","refId":"A"}]},
+    {"type":"timeseries","title":"Replay lag (bytes)","id":3,"gridPos":{"h":8,"w":12,"x":12,"y":0},"targets":[{"expr":"pgsentry_replication_lag_bytes","refId":"A"}]},
+    {"type":"state-timeline","title":"Patroni role","id":4,"gridPos":{"h":8,"w":12,"x":0,"y":4},"targets":[{"expr":"patroni_primary","legendFormat":"{{name}} primary","refId":"A"},{"expr":"patroni_replica","legendFormat":"{{name}} replica","refId":"B"}]},
+    {"type":"timeseries","title":"PostgreSQL host disk available","id":5,"gridPos":{"h":8,"w":12,"x":12,"y":8},"targets":[{"expr":"node_filesystem_avail_bytes{instance=~\"192.168.130.1[1-3]:9100\",mountpoint=\"/\"}","legendFormat":"{{instance}}","refId":"A"}]},
+    {"type":"stat","title":"Connections / waiting locks / long transactions","id":6,"gridPos":{"h":5,"w":12,"x":0,"y":12},"targets":[{"expr":"pgsentry_postgresql_connections","refId":"A"},{"expr":"pgsentry_postgresql_waiting_locks","refId":"B"},{"expr":"pgsentry_postgresql_long_transactions","refId":"C"}]},
+    {"type":"timeseries","title":"Transactions","id":7,"gridPos":{"h":5,"w":12,"x":12,"y":16},"targets":[{"expr":"rate(pgsentry_postgresql_commits_total[5m])","refId":"A"},{"expr":"rate(pgsentry_postgresql_rollbacks_total[5m])","refId":"B"}]},
+    {"type":"stat","title":"Database size","id":8,"gridPos":{"h":5,"w":12,"x":0,"y":17},"targets":[{"expr":"pgsentry_postgresql_database_size_bytes","refId":"A"}]}
+  ]
+}

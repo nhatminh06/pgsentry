@@ -1,0 +1,11 @@
+{
+  "annotations":{"list":[]},"editable":false,"id":null,"schemaVersion":41,"tags":["pgsentry","operations"],"timezone":"utc","title":"PgSentry DCS, Routing, and Recovery","uid":"pgsentry-dcs-routing-recovery","version":1,"time":{"from":"now-1h","to":"now"},"panels":[
+    {"type":"stat","title":"Healthy etcd members","id":1,"gridPos":{"h":4,"w":6,"x":0,"y":0},"targets":[{"expr":"pgsentry_etcd_healthy_members","refId":"A"}]},
+    {"type":"stat","title":"etcd leader count","id":2,"gridPos":{"h":4,"w":6,"x":6,"y":0},"targets":[{"expr":"sum(etcd_server_has_leader)","refId":"A"}]},
+    {"type":"stat","title":"Writable HAProxy backends","id":3,"gridPos":{"h":4,"w":6,"x":12,"y":0},"targets":[{"expr":"pgsentry_haproxy_writable_backends","refId":"A"}]},
+    {"type":"stat","title":"HAProxy endpoint","id":4,"gridPos":{"h":4,"w":6,"x":18,"y":0},"targets":[{"expr":"up{job=\"haproxy\"}","refId":"A"}]},
+    {"type":"stat","title":"Backup age (hours)","id":5,"gridPos":{"h":5,"w":8,"x":0,"y":4},"targets":[{"expr":"(time()-pgsentry_backup_last_success_timestamp_seconds)/3600","refId":"A"}]},
+    {"type":"stat","title":"WAL archive failures","id":6,"gridPos":{"h":5,"w":8,"x":8,"y":4},"targets":[{"expr":"pgsentry_wal_archive_failures_total","refId":"A"}]},
+    {"type":"gauge","title":"control-01 root available percent","id":7,"gridPos":{"h":5,"w":8,"x":16,"y":4},"targets":[{"expr":"100*node_filesystem_avail_bytes{instance=\"192.168.130.31:9100\",mountpoint=\"/\"}/node_filesystem_size_bytes{instance=\"192.168.130.31:9100\",mountpoint=\"/\"}","refId":"A"}]}
+  ]
+}

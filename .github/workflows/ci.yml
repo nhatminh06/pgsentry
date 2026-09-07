@@ -28,3 +28,5 @@ jobs:
         run: make tf-validate
       - name: Shell syntax
         run: find scripts -name '*.sh' -print0 | xargs -0 -n1 bash -n
+      - name: M10 monitoring configuration
+        run: make observability-static
