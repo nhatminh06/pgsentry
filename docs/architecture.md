@@ -6,7 +6,7 @@ The canonical topology uses seven VMs: three PostgreSQL-role nodes, three etcd-r
 
 The control VM is also separate. Workload generation, client-visible measurements, HAProxy, and fault injection will eventually run there so the observer and injector remain alive when a database or etcd target is deliberately stopped. M1 provisions only the host and its network attachment.
 
-The three-node `colocated` profile reduces laptop cost by allowing PostgreSQL, Patroni, and etcd to share each node in later milestones. It is useful for development, but only the `full` profile may produce canonical M5–M9 evidence.
+The three-node `colocated` profile reduces laptop cost by allowing PostgreSQL, Patroni, and etcd to share each node. It is useful for development, but only the `full` profile may produce canonical M5–M10 evidence.
 
 ## Network model
 
@@ -23,17 +23,39 @@ Each profile receives its own libvirt NAT network with deterministic DHCP reserv
 
 M1 does not open these ports to `0.0.0.0/0` or install services. Guest-level, role-specific firewall rules belong to the milestone that owns each service, when its bind addresses and operational requirements exist.
 
-## Later CI architecture
+## Final system architecture
+
+```text
+Client -> control-01 HAProxy -> Patroni PostgreSQL pg-01/02/03
+                                      | physical WAL
+                                      v
+                              etcd-01/02/03 (mTLS)
+
+all seven hosts + native service endpoints
+                  |
+                  v
+      control-01 Prometheus (observer)
+           /                 \
+   Alertmanager             Grafana
+        |
+     runbooks
+
+PostgreSQL -> backup + WAL -> control-01 pgBackRest -> isolated restore/PITR
+```
+
+Prometheus and Alertmanager observe state but never participate in DCS leadership, PostgreSQL promotion, or HAProxy routing. `control-01` consolidates routing, backup, and monitoring to bound lab cost; this failure-domain colocation is not a production recommendation.
+
+## CI architecture
 
 ```text
 GitHub-hosted PR CI
     -> Go tests, lint, Terraform validation, static pgsafe checks
 
-Self-hosted reliability CI with real VM access
-    -> chaos tests, runtime migration tests, backup restore, PITR
+Local or future self-hosted reliability CI with real VM access
+    -> chaos, runtime migration, backup/PITR, monitoring alert lifecycle
 ```
 
-This is future architecture, not M1 functionality. No CI workflows or later milestone tools are implemented here.
+Hosted CI validates source, Terraform, monitoring rules, Alertmanager configuration, dashboards, and runbook links. It does not claim seven-VM runtime acceptance. No permanently pending self-hosted workflow is configured.
 
 ## M2 PostgreSQL boundary
 
@@ -82,3 +104,9 @@ Selected lock demonstrations are separate shell automation for the canonical ful
 M9 mounts a restricted NFSv4 pgBackRest repository physically hosted at `control-01:/var/lib/pgbackrest` on each Patroni member. Patroni's dynamic PostgreSQL configuration owns `archive_mode`, `archive_command`, and restart semantics; systemd still owns Patroni, and Patroni still owns every live PostgreSQL process. Backups dynamically use the current leader.
 
 Latest-state and PITR restores run outside Patroni on control-01 in fresh `/var/lib/pgbackrest-restore/*` directories. They bind only `127.0.0.1:55432`, use explicit `pg_ctl` lifecycle, never join the DCS, and never enter HAProxy. This off-PGDATA repository is operational separation inside one lab network, not geographic disaster recovery.
+
+## M10 observability and operations boundary
+
+Prometheus and Alertmanager run loopback-only on `control-01`; authenticated Grafana is reachable only through the lab network/host path. node_exporter runs on all seven VMs. Prometheus scrapes Patroni, HAProxy, and etcd native metrics without weakening mutual TLS. A dedicated `pg_monitor` login and etcd client certificate are generated at runtime.
+
+A minimal collector publishes cross-component semantics: writable-primary count, streaming replicas, byte replay lag, healthy etcd members, writable HAProxy backends, backup age, and archive failures. These feed actionable rules, Git-provisioned dashboards, and runbooks. Monitoring remains outside the HA control plane.

@@ -1,0 +1,14 @@
+{
+  "annotations":{"list":[]},"editable":false,"id":null,"schemaVersion":41,"tags":["pgsentry"],"timezone":"utc","title":"PgSentry Overview","uid":"pgsentry-overview","version":1,
+  "time":{"from":"now-1h","to":"now"},"panels":[
+    {"type":"stat","title":"Writable primaries","id":1,"gridPos":{"h":4,"w":4,"x":0,"y":0},"targets":[{"expr":"pgsentry_postgresql_primary_count","refId":"A"}]},
+    {"type":"stat","title":"Streaming replicas","id":2,"gridPos":{"h":4,"w":4,"x":4,"y":0},"targets":[{"expr":"pgsentry_postgresql_replica_count","refId":"A"}]},
+    {"type":"stat","title":"Largest replication lag (bytes)","id":3,"gridPos":{"h":4,"w":4,"x":8,"y":0},"targets":[{"expr":"pgsentry_replication_lag_bytes","refId":"A"}]},
+    {"type":"stat","title":"Healthy etcd members","id":4,"gridPos":{"h":4,"w":4,"x":12,"y":0},"targets":[{"expr":"pgsentry_etcd_healthy_members","refId":"A"}]},
+    {"type":"stat","title":"Writable HAProxy backends","id":5,"gridPos":{"h":4,"w":4,"x":16,"y":0},"targets":[{"expr":"pgsentry_haproxy_writable_backends","refId":"A"}]},
+    {"type":"stat","title":"Backup age (hours)","id":6,"gridPos":{"h":4,"w":4,"x":20,"y":0},"targets":[{"expr":"(time()-pgsentry_backup_last_success_timestamp_seconds)/3600","refId":"A"}]},
+    {"type":"stat","title":"Firing alerts","id":7,"gridPos":{"h":4,"w":6,"x":0,"y":4},"targets":[{"expr":"count(ALERTS{alertstate=\"firing\"})","refId":"A"}]},
+    {"type":"timeseries","title":"VM available memory","id":8,"gridPos":{"h":8,"w":9,"x":6,"y":4},"targets":[{"expr":"node_memory_MemAvailable_bytes","legendFormat":"{{instance}}","refId":"A"}]},
+    {"type":"timeseries","title":"VM CPU busy","id":9,"gridPos":{"h":8,"w":9,"x":15,"y":4},"targets":[{"expr":"100*(1-avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])))","legendFormat":"{{instance}}","refId":"A"}]}
+  ]
+}

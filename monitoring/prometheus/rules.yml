@@ -1,0 +1,68 @@
+groups:
+  - name: pgsentry-safety
+    rules:
+      - alert: PgSentryMultiplePrimaries
+        expr: pgsentry_postgresql_primary_count > 1
+        for: 15s
+        labels: {severity: critical}
+        annotations:
+          summary: Multiple writable PostgreSQL primaries observed
+          description: "Writable primary count is {{ $value }}; stop application writes and fence the unsafe writer."
+          runbook: docs/runbooks/multiple-primaries.md
+      - alert: PgSentryNoPrimary
+        expr: pgsentry_postgresql_primary_count == 0
+        for: 30s
+        labels: {severity: critical}
+        annotations: {summary: No writable PostgreSQL primary, description: "No Patroni member reports a writable primary.", runbook: docs/runbooks/no-primary.md}
+      - alert: PgSentryNoWritableBackend
+        expr: pgsentry_haproxy_writable_backends == 0
+        for: 30s
+        labels: {severity: critical}
+        annotations: {summary: HAProxy has no writable backend, description: "New clients cannot reach a primary through port 5000.", runbook: docs/runbooks/haproxy-unavailable.md}
+      - alert: PgSentryHAProxyDown
+        expr: up{job="haproxy"} == 0
+        for: 30s
+        labels: {severity: critical}
+        annotations: {summary: HAProxy metrics endpoint is down, description: "HAProxy on control-01 is unavailable or unreachable.", runbook: docs/runbooks/haproxy-unavailable.md}
+      - alert: PgSentryEtcdQuorumLost
+        expr: pgsentry_etcd_healthy_members < 2
+        for: 30s
+        labels: {severity: critical}
+        annotations: {summary: etcd quorum is unavailable, description: "Fewer than two of three etcd members are healthy.", runbook: docs/runbooks/etcd-quorum.md}
+  - name: pgsentry-operations
+    rules:
+      - alert: PgSentryReplicaCountLow
+        expr: pgsentry_postgresql_replica_count < 2
+        for: 30s
+        labels: {severity: warning}
+        annotations: {summary: PostgreSQL replica count is low, description: "Expected two streaming replicas; observed {{ $value }}.", runbook: docs/runbooks/replication-degraded.md}
+      - alert: PgSentryReplicationLagHigh
+        expr: pgsentry_replication_lag_bytes > 1048576
+        for: 30s
+        labels: {severity: warning}
+        annotations: {summary: PostgreSQL replication byte lag is high, description: "Maximum replay lag is {{ $value }} bytes.", runbook: docs/runbooks/replication-lag.md}
+      - alert: PgSentryEtcdMemberDown
+        expr: pgsentry_etcd_healthy_members < 3
+        for: 30s
+        labels: {severity: warning}
+        annotations: {summary: An etcd member is unavailable, description: "Healthy etcd members: {{ $value }}/3.", runbook: docs/runbooks/etcd-quorum.md}
+      - alert: PgSentryWALArchiveFailure
+        expr: increase(pgsentry_wal_archive_failures_total[5m]) > 0
+        for: 15s
+        labels: {severity: warning}
+        annotations: {summary: PostgreSQL WAL archival failed recently, description: "The cumulative archive failure counter increased in five minutes.", runbook: docs/runbooks/wal-archive-failure.md}
+      - alert: PgSentryBackupStale
+        expr: time() - pgsentry_backup_last_success_timestamp_seconds > 86400
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: Latest full backup is older than lab policy, description: "Backup age exceeds the 24-hour demonstration threshold.", runbook: docs/runbooks/backup-stale.md}
+      - alert: PgSentryDiskSpaceLow
+        expr: 100 * node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"} < 15
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: Host filesystem free space is low, description: "Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }} has under 15% available.", runbook: docs/runbooks/disk-space.md}
+      - alert: PgSentryPatroniMemberDown
+        expr: up{job="patroni"} == 0
+        for: 1m
+        labels: {severity: warning}
+        annotations: {summary: Patroni member endpoint is unavailable, description: "Patroni metrics scrape failed for {{ $labels.instance }}.", runbook: docs/runbooks/replication-degraded.md}

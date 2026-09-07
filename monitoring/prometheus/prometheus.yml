@@ -1,0 +1,49 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: pgsentry-full
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['127.0.0.1:9093']
+
+rule_files:
+  - /etc/prometheus/rules.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['127.0.0.1:9090']
+  - job_name: node
+    static_configs:
+      - targets:
+          - 192.168.130.11:9100
+          - 192.168.130.12:9100
+          - 192.168.130.13:9100
+          - 192.168.130.21:9100
+          - 192.168.130.22:9100
+          - 192.168.130.23:9100
+          - 192.168.130.31:9100
+  - job_name: patroni
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['192.168.130.11:8008', '192.168.130.12:8008', '192.168.130.13:8008']
+  - job_name: etcd
+    scheme: https
+    tls_config:
+      ca_file: /etc/prometheus/pki/etcd-ca.crt
+      cert_file: /etc/prometheus/pki/etcd-monitor.crt
+      key_file: /etc/prometheus/pki/etcd-monitor.key
+    static_configs:
+      - targets: ['192.168.130.21:2379']
+        labels: {member: etcd-01}
+      - targets: ['192.168.130.22:2379']
+        labels: {member: etcd-02}
+      - targets: ['192.168.130.23:2379']
+        labels: {member: etcd-03}
+  - job_name: haproxy
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['127.0.0.1:8405']

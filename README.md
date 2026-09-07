@@ -1,168 +1,136 @@
-# pgsentry
+# PgSentry
 
-pgsentry is a PostgreSQL reliability engineering lab that measures and verifies database behavior under failover, partitions, unsafe migrations, and recovery — rather than merely demonstrating that an HA stack can be deployed.
+PgSentry is a PostgreSQL reliability engineering lab that verifies high availability, failure behavior, migration safety, durability, historical recovery, and operational alerting with reproducible evidence.
 
-It is an evidence-producing reliability lab, not a generic PostgreSQL deployment, Kubernetes demo, Patroni showcase, Terraform showcase, unrelated DevOps toolkit, or consensus implementation.
+## Why PgSentry
 
-## Status and roadmap
+Deploying an HA stack does not show what clients experience during failure, whether a partition creates two writers, whether acknowledged data survives, whether a migration blocks traffic, or whether a backup can restore history. PgSentry turns those questions into bounded experiments with explicit safety assertions and machine-readable evidence.
 
-M1 provides VM infrastructure, M2 demonstrates manual PostgreSQL replication, M3 proves independent etcd quorum, M4 integrates Patroni-managed PostgreSQL with HAProxy, and M5 adds repeatable client-visible failure experiments. M6 compares asynchronous and synchronous durability policies.
+## Architecture
 
-| Milestone | Capability | Status |
+```text
+clients -> HAProxy :5000 -> Patroni PostgreSQL pg-01/02/03
+                              | physical WAL replication
+                              v
+                         etcd-01/02/03
+
+all seven VMs + PostgreSQL + Patroni + etcd + HAProxy + pgBackRest
+                              |
+                              v
+                 Prometheus -> Alertmanager -> runbooks
+                              |
+                              v
+                           Grafana
+
+PostgreSQL -> full backup + archived WAL -> control-01 repository
+                                               |
+                                               v
+                                  isolated restore / named PITR
+```
+
+Prometheus observes the system; it never participates in leader election or routing. `control-01` consolidates routing, backup storage, and monitoring to fit a laptop lab. That is not a production colocation recommendation. See [the complete architecture](docs/architecture.md).
+
+## What it demonstrates
+
+| Capability | Verified behavior | Evidence |
 | --- | --- | --- |
-| M1 | Terraform infrastructure | Implemented and verified |
-| M2 | Manual PostgreSQL streaming replication | Implemented; canonical runtime verified |
-| M3 | etcd quorum | Implemented and verified |
-| M4 | Patroni HA and HAProxy routing | Implemented and verified |
-| M5 | Automated failure and durability harness | Implemented and verified |
-| M6 | Synchronous durability experiments | Implemented and verified |
-| M7 | Network-partition and DCS chaos | Complete |
-| M8 | pgsafe migration safety CLI | Complete |
-| M9 | Backup, WAL, and PITR verification | Complete |
-| M10 | Observability, runbooks, and portfolio polish | Planned |
+| Infrastructure | Seven deterministic libvirt VMs provision and destroy | M1 |
+| Replication | One primary and two read-only streaming replicas | M2 |
+| Consensus | Three-member mutual-TLS etcd quorum and bounded failures | M3 |
+| Database HA | Patroni promotion and HAProxy role-aware routing | M4 |
+| Failure measurement | Client interruption, ambiguity, retained acknowledgements | M5 |
+| Durability | Async, sync, and sync-strict policy tradeoffs | M6 |
+| Partition safety | Bounded DCS/WAL partitions with writer-count assertions | M7 |
+| Migration safety | PostgreSQL 16 AST analysis and real lock demonstrations | M8 |
+| Historical recovery | Full backup, post-backup WAL replay, named-target PITR | M9 |
+| Operations | Semantic metrics, alerts, Git dashboards, and runbooks | M10 |
 
-## Topologies
+The [evidence matrix](docs/evidence.md) separates measured observations from broader claims.
 
-The canonical `full` profile creates seven VMs: three PostgreSQL-role nodes, three etcd-role nodes, and a dedicated control node. Later M5–M9 measurements published as project evidence must use this topology.
+## Reliability findings
 
-The `colocated` profile creates three development VMs. Each can later host PostgreSQL, Patroni, and etcd, but results from this resource-constrained topology are not canonical evidence.
+- HAProxy provides a stable write endpoint, but existing sessions still require retry/reconnect behavior after failover.
+- No acknowledged-row loss was observed in finite M5/M6 trials; this is not a universal RPO=0 guarantee.
+- Sync-strict mode blocked bounded writes when no eligible synchronous standby existed.
+- M7 directly sampled every database member and observed no more than one writable primary in its bounded matrix.
+- Replication copied an intentional DELETE to both replicas. M9 PITR reconstructed the deleted row from backup plus archived WAL.
+- M10 requires real replica, etcd-member, HAProxy, and replay-lag alerts to fire in Prometheus/Alertmanager and resolve after recovery.
 
-See [the architecture](docs/architecture.md) for the separation and network rationale.
+## Migration safety
 
-## Prerequisites
-
-- Terraform 1.8 or newer
-- Linux with KVM, libvirt, and a running system libvirt daemon
-- The `default` libvirt storage pool
-- An OpenSSH public key for cloud-init access
-- Capacity for either three development VMs or seven canonical VMs
-
-The provider downloads the configured Ubuntu cloud image during the first apply. No credentials or private keys belong in Terraform variables or state.
-
-## Infrastructure quick start
-
-```bash
-cp terraform/environments/colocated/terraform.tfvars.example \
-  terraform/environments/colocated/terraform.tfvars
-make tf-validate
-make cluster-up PROFILE=colocated
-```
-
-Inspect the `ssh_targets` output, then connect with the configured SSH user. Remove the profile with:
-
-```bash
-make cluster-down PROFILE=colocated
-```
-
-Use `PROFILE=full` only on a host sized for all seven canonical VMs. Terraform state and local variable files are ignored by Git.
-
-## M2 quick start
-
-M2 uses Ubuntu 24.04's PostgreSQL 16 packages. Configuration is performed over SSH after Terraform finishes, keeping guest service configuration out of the infrastructure modules. For canonical evidence:
-
-```bash
-make cluster-up PROFILE=full
-make pg-configure PROFILE=full
-make pg-verify PROFILE=full
-make pg-failover PROFILE=full   # destructive: stops pg-01 and promotes pg-02
-make cluster-down PROFILE=full
-```
-
-Set `PGSENTRY_SSH_KEY` if the private key is not `~/.ssh/id_ed25519`. The replication password is generated at runtime under ignored `.pgsentry/`, is never committed, and is removed by `cluster-down` or `make pg-clean`.
-
-`pg-verify` is non-destructive to cluster roles: it verifies roles, both streaming connections, replicated data, standby write protection, and restart/reconnect behavior. `pg-failover` is deliberately separate and clearly destructive. See [the M2 runbook](docs/m2-postgresql.md) for inspection commands and split-brain precautions.
-
-## M3 quick start
-
-M3 pins etcd and etcdctl v3.7.1 and generates runtime-only TLS credentials. On a provisioned profile:
-
-```bash
-make etcd-configure PROFILE=full
-make etcd-verify PROFILE=full
-make etcd-quorum-test PROFILE=full # destructive but self-restoring
-```
-
-The quorum test dynamically stops the elected leader, proves two-member availability, demonstrates one-member quorum loss with bounded operations, restores the members, and verifies persistence across a controlled full service restart. See [the M3 runbook](docs/m3-etcd.md).
-
-## M4 quick start
-
-On a fresh environment, configure etcd first, then Patroni and HAProxy:
-
-```bash
-make etcd-configure PROFILE=full
-make patroni-configure PROFILE=full
-make patroni-verify PROFILE=full
-make haproxy-configure PROFILE=full
-make haproxy-verify PROFILE=full
-make patroni-failover-test PROFILE=full # destructive, self-restoring
-```
-
-Patroni owns PostgreSQL once M4 is configured; do not run the M2 `pg-*` configuration targets on the same live data directories. See [the M4 runbook](docs/m4-patroni-haproxy.md).
-
-## M5 quick start
-
-After the full M4 stack passes verification:
-
-```bash
-make failure-baseline PROFILE=full
-make failure-scenario PROFILE=full SCENARIO=primary-service-loss
-make failure-matrix PROFILE=full
-make failure-report
-```
-
-The destructive scenarios are individually named, restore their failure state, and store machine-readable evidence under ignored `.pgsentry/results/m5/`. See [the M5 runbook](docs/m5-failure-testing.md).
-
-## M6 quick start
-
-M6 reuses the M5 client and failure analysis while changing Patroni's cluster-wide durability policy:
-
-```bash
-make durability-set PROFILE=full MODE=sync
-make durability-verify PROFILE=full MODE=sync
-make durability-latency PROFILE=full MODE=sync
-make durability-failure-test PROFILE=full MODE=sync TRIAL=1 # destructive, self-restoring
-make durability-report
-```
-
-The default after experiments is restored to `async`. Strict mode deliberately blocks bounded client writes when no synchronous standby exists. See [the M6 runbook](docs/m6-synchronous-durability.md).
-
-## M7 quick start
-
-M7 extends the M5 safety and availability harness with bounded, tagged network partitions and DCS quorum experiments:
-
-```bash
-make chaos-baseline PROFILE=full
-make chaos-scenario PROFILE=full CHAOS_SCENARIO=replica-dcs-isolation
-make chaos-matrix PROFILE=full
-make chaos-report
-```
-
-Every scenario is destructive but self-restoring. Normal writes remain on the same HAProxy endpoint, and direct SQL sampling fails immediately if more than one writable primary is observed. See [the M7 runbook](docs/m7-network-dcs-chaos.md).
-
-## M8 quick start
-
-`pgsafe` statically analyzes PostgreSQL 16 migration SQL and never connects to or executes against a database:
+`pgsafe` is a read-only Go CLI using the PostgreSQL 16 parser AST. It flags dangerous locks, rewrites, destructive statements, transaction-incompatible operations, and missing timeout policy without connecting to a database.
 
 ```bash
 make pgsafe-build
-./bin/pgsafe check migration.sql
 ./bin/pgsafe check migration.sql --format=json --fail-on=high
-./bin/pgsafe check migration.sql --transaction-mode=wrapped
-./bin/pgsafe rules
 ./bin/pgsafe explain PGSAFE001
 ```
 
-Static fixtures run in hosted CI with `make pgsafe-fixtures`. The explicitly named `make migration-runtime-test PROFILE=full` separately manipulates only disposable objects on the canonical local cluster. See [the M8 runbook](docs/m8-pgsafe.md) and [rule catalog](docs/pgsafe-rules.md).
+See [the guide](docs/m8-pgsafe.md) and [rule catalog](docs/pgsafe-rules.md).
 
-## M9 quick start
+## Backup and recovery
 
-M9 stores pgBackRest physical backups and archived WAL on `control-01`, then starts loopback-only recovery instances outside Patroni:
+pgBackRest stores full physical backups and archived WAL on `control-01`. M9 proved that a latest restore included a post-backup marker and named-target PITR restored a row that replication had deleted everywhere. A successful or young backup is not equivalent to a proven restore. See [M9](docs/m9-backup-pitr.md).
+
+## Observability
+
+Prometheus scrapes node_exporter on all seven VMs plus native Patroni, etcd mTLS, and HAProxy endpoints. A small collector publishes stable primary-count, replica-count, byte-lag, DCS, routing, backup-age, and archive-failure metrics. Alertmanager records local alert lifecycle, Grafana is provisioned from Git, and every alert points to a [runbook](docs/runbooks/).
+
+## Quick start
+
+The canonical path requires Linux/KVM, libvirt, Terraform 1.8+, the `default` libvirt pool, an SSH key, and capacity for seven Ubuntu 24.04 VMs.
 
 ```bash
+cp terraform/environments/full/terraform.tfvars.example terraform/environments/full/terraform.tfvars
+make tf-validate
+make cluster-up PROFILE=full
+make etcd-configure PROFILE=full
+make patroni-configure PROFILE=full
+make haproxy-configure PROFILE=full
 make backup-configure PROFILE=full
-make backup-check PROFILE=full
-make backup-acceptance PROFILE=full # intentionally DELETEs disposable M9 data
-make backup-clean PROFILE=full
+make backup-full PROFILE=full
+make observability-configure PROFILE=full
+make observability-verify PROFILE=full
 ```
 
-The acceptance flow proves both post-backup WAL replay and PITR to a named restore point after replication has copied a DELETE to every live replica. See [the M9 runbook](docs/m9-backup-pitr.md).
+Use [operations](docs/operations.md) for inspection and teardown or [the demo](docs/demo.md) for a concise walkthrough.
+
+## Repository structure
+
+| Path | Purpose |
+| --- | --- |
+| `terraform/` | Canonical and development libvirt topology |
+| `scripts/` | Service lifecycle and bounded reliability experiments |
+| `monitoring/` | Prometheus rules/configuration and Grafana assets |
+| `cmd/pgsafe`, `internal/pgsafe` | Migration-safety CLI |
+| `docs/runbooks/` | Alert response procedures |
+| `docs/` | Architecture, evidence, operations, demo, and deep dives |
+
+## Security model
+
+Services are limited to private libvirt subnets. etcd retains mutual TLS. PostgreSQL monitoring uses a dedicated `pg_monitor` login. Grafana requires a generated administrator password. Secrets exist only under ignored `.pgsentry/`; runtime databases, TSDBs, backup data, WAL, images, and Terraform state are not committed.
+
+## Limitations
+
+PgSentry is a finite single-host lab, not production-ready infrastructure. It does not prove a production SLA, universal RTO/RPO, perfect alerts, long-duration capacity, off-site/immutable backup, geographic DR, HA monitoring/routing, zero false positives/negatives, or correctness under arbitrary failures.
+
+## Design decisions and deep dives
+
+[Architecture](docs/architecture.md) · [Evidence](docs/evidence.md) · [Operations](docs/operations.md) · [Demo](docs/demo.md) · [M5 failures](docs/m5-failure-testing.md) · [M6 durability](docs/m6-synchronous-durability.md) · [M7 partitions](docs/m7-network-dcs-chaos.md) · [M8 migrations](docs/m8-pgsafe.md) · [M9 recovery](docs/m9-backup-pitr.md) · [M10 observability](docs/m10-observability.md)
+
+## Roadmap
+
+| Milestone | Capability | Status |
+| --- | --- | --- |
+| M1 | Terraform/libvirt infrastructure | Complete |
+| M2 | PostgreSQL physical replication | Complete |
+| M3 | Independent etcd quorum | Complete |
+| M4 | Patroni HA and HAProxy routing | Complete |
+| M5 | Failure and durability evidence harness | Complete |
+| M6 | Synchronous durability experiments | Complete |
+| M7 | Network-partition and DCS chaos | Complete |
+| M8 | pgsafe migration-safety CLI | Complete |
+| M9 | Backup, WAL, and PITR verification | Complete |
+| M10 | Observability, runbooks, and portfolio polish | Complete |
+
+Planned project roadmap complete. Optional future work—off-site storage, HA routing/monitoring, geographic DR, self-hosted reliability CI, and longer soak tests—is outside the completed roadmap.

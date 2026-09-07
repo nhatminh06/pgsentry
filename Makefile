@@ -6,11 +6,12 @@ CHAOS_SCENARIO ?= primary-dcs-isolation
 FILE ?= testdata/migrations/safe/staged.sql
 PGSAFE ?= ./bin/pgsafe
 RESTORE_MODE ?= latest
+ALERT_TEST ?= replica-loss
 TERRAFORM ?= terraform
 TF_DIR := terraform/environments/$(PROFILE)
 VALID_PROFILES := full colocated
 
-.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean etcd-configure etcd-verify etcd-quorum-test etcd-clean patroni-configure patroni-verify haproxy-configure haproxy-verify patroni-failover-test failure-baseline failure-scenario failure-matrix failure-report failure-clean durability-set durability-verify durability-latency durability-failure-test durability-standby-loss durability-strict-test durability-matrix durability-report durability-clean chaos-baseline chaos-scenario chaos-matrix chaos-report chaos-clean pgsafe-build pgsafe-test pgsafe-check pgsafe-fixtures migration-baseline migration-runtime-test migration-clean backup-configure backup-check backup-full backup-info backup-archive-verify restore-latest restore-verify restore-clean pitr-test backup-acceptance backup-clean
+.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean etcd-configure etcd-verify etcd-quorum-test etcd-clean patroni-configure patroni-verify haproxy-configure haproxy-verify patroni-failover-test failure-baseline failure-scenario failure-matrix failure-report failure-clean durability-set durability-verify durability-latency durability-failure-test durability-standby-loss durability-strict-test durability-matrix durability-report durability-clean chaos-baseline chaos-scenario chaos-matrix chaos-report chaos-clean pgsafe-build pgsafe-test pgsafe-check pgsafe-fixtures migration-baseline migration-runtime-test migration-clean backup-configure backup-check backup-full backup-info backup-archive-verify restore-latest restore-verify restore-clean pitr-test backup-acceptance backup-clean observability-configure observability-check observability-verify observability-alert-test observability-clean observability-static
 
 tf-fmt:
 	$(TERRAFORM) fmt -recursive terraform
@@ -192,3 +193,22 @@ backup-acceptance: check-profile
 
 backup-clean: check-profile
 	./scripts/backup/clean.sh $(PROFILE) all
+
+observability-configure: check-profile
+	./scripts/observability/configure.sh $(PROFILE)
+
+observability-check: check-profile
+	./scripts/observability/check.sh $(PROFILE)
+
+observability-verify: check-profile
+	./scripts/observability/verify.sh $(PROFILE)
+
+# Explicitly destructive and self-restoring; ALERT_TEST=replica-loss|etcd-member-loss|haproxy-loss|replication-lag.
+observability-alert-test: check-profile
+	./scripts/observability/alert-test.sh $(PROFILE) $(ALERT_TEST)
+
+observability-clean: check-profile
+	./scripts/observability/clean.sh $(PROFILE)
+
+observability-static:
+	./scripts/observability/static-check.sh
