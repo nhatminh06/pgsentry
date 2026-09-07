@@ -5,11 +5,12 @@ MODE ?= async
 CHAOS_SCENARIO ?= primary-dcs-isolation
 FILE ?= testdata/migrations/safe/staged.sql
 PGSAFE ?= ./bin/pgsafe
+RESTORE_MODE ?= latest
 TERRAFORM ?= terraform
 TF_DIR := terraform/environments/$(PROFILE)
 VALID_PROFILES := full colocated
 
-.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean etcd-configure etcd-verify etcd-quorum-test etcd-clean patroni-configure patroni-verify haproxy-configure haproxy-verify patroni-failover-test failure-baseline failure-scenario failure-matrix failure-report failure-clean durability-set durability-verify durability-latency durability-failure-test durability-standby-loss durability-strict-test durability-matrix durability-report durability-clean chaos-baseline chaos-scenario chaos-matrix chaos-report chaos-clean pgsafe-build pgsafe-test pgsafe-check pgsafe-fixtures migration-baseline migration-runtime-test migration-clean
+.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean etcd-configure etcd-verify etcd-quorum-test etcd-clean patroni-configure patroni-verify haproxy-configure haproxy-verify patroni-failover-test failure-baseline failure-scenario failure-matrix failure-report failure-clean durability-set durability-verify durability-latency durability-failure-test durability-standby-loss durability-strict-test durability-matrix durability-report durability-clean chaos-baseline chaos-scenario chaos-matrix chaos-report chaos-clean pgsafe-build pgsafe-test pgsafe-check pgsafe-fixtures migration-baseline migration-runtime-test migration-clean backup-configure backup-check backup-full backup-info backup-archive-verify restore-latest restore-verify restore-clean pitr-test backup-acceptance backup-clean
 
 tf-fmt:
 	$(TERRAFORM) fmt -recursive terraform
@@ -155,3 +156,39 @@ migration-runtime-test: check-profile
 
 migration-clean: check-profile
 	./scripts/migrations/clean.sh $(PROFILE)
+
+# M9: backup-acceptance intentionally creates and DELETEs disposable m9_recovery data.
+backup-configure: check-profile
+	./scripts/backup/configure.sh $(PROFILE)
+
+backup-check: check-profile
+	./scripts/backup/check.sh $(PROFILE)
+
+backup-full: check-profile
+	./scripts/backup/full.sh $(PROFILE)
+
+backup-info: check-profile
+	./scripts/backup/info.sh $(PROFILE)
+
+backup-archive-verify: check-profile
+	./scripts/backup/archive-verify.sh $(PROFILE)
+
+restore-latest: check-profile
+	./scripts/backup/restore.sh $(PROFILE) latest
+
+restore-verify: check-profile
+	./scripts/backup/verify-restore.sh $(PROFILE) $(RESTORE_MODE)
+
+restore-clean: check-profile
+	./scripts/backup/clean.sh $(PROFILE) restore
+
+pitr-test: check-profile
+	./scripts/backup/restore.sh $(PROFILE) pitr
+	./scripts/backup/verify-restore.sh $(PROFILE) pitr
+
+backup-acceptance: check-profile
+	@echo 'WARNING: creates, backs up, restores, and intentionally DELETEs disposable m9_recovery data'
+	./scripts/backup/acceptance.sh $(PROFILE)
+
+backup-clean: check-profile
+	./scripts/backup/clean.sh $(PROFILE) all

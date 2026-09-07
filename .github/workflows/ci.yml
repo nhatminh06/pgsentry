@@ -26,3 +26,5 @@ jobs:
         run: make pgsafe-fixtures
       - name: Terraform formatting and validation
         run: make tf-validate
+      - name: Shell syntax
+        run: find scripts -name '*.sh' -print0 | xargs -0 -n1 bash -n
