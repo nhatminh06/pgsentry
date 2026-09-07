@@ -70,3 +70,9 @@ The same M5 sequenced workload measures healthy commit latency, failure interrup
 M7 keeps the canonical topology, Patroni ownership, etcd mutual TLS, async default, and stable HAProxy write path. It introduces one bounded failure dimension at a time: DCS isolation of a database member, loss of etcd quorum, peer isolation of the elected etcd leader, or interruption of both replica WAL connections. Tagged guest-local firewall rules preserve SSH and unrelated ports and are removed exactly by cleanup traps.
 
 Direct SQL observations sample all database members throughout each fault. More than one writable PostgreSQL node is an immediate safety failure. These controlled partitions do not model arbitrary packet loss, delay, reordering, Byzantine behavior, or every asymmetric topology.
+
+## M8 migration-safety boundary
+
+`pgsafe` is a standalone, read-only Go CLI. SQL flows through the PostgreSQL 16 `libpg_query` parser, its AST is evaluated by deterministic rules, and diagnostics are rendered as text or JSON. The CLI has no database driver or execution path. GitHub-hosted CI runs only static build, test, fixture, and Terraform checks.
+
+Selected lock demonstrations are separate shell automation for the canonical full topology. They use a disposable `pgsafe_m8` schema, bounded PostgreSQL timeouts, the existing HAProxy client path, and ignored evidence under `.pgsentry/results/m8/`. Patroni continues to own PostgreSQL; M8 does not inject node, DCS, or network failures.

@@ -3,11 +3,13 @@ SCENARIO ?= primary-service-loss
 TRIAL ?= 1
 MODE ?= async
 CHAOS_SCENARIO ?= primary-dcs-isolation
+FILE ?= testdata/migrations/safe/staged.sql
+PGSAFE ?= ./bin/pgsafe
 TERRAFORM ?= terraform
 TF_DIR := terraform/environments/$(PROFILE)
 VALID_PROFILES := full colocated
 
-.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean etcd-configure etcd-verify etcd-quorum-test etcd-clean patroni-configure patroni-verify haproxy-configure haproxy-verify patroni-failover-test failure-baseline failure-scenario failure-matrix failure-report failure-clean durability-set durability-verify durability-latency durability-failure-test durability-standby-loss durability-strict-test durability-matrix durability-report durability-clean chaos-baseline chaos-scenario chaos-matrix chaos-report chaos-clean
+.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean etcd-configure etcd-verify etcd-quorum-test etcd-clean patroni-configure patroni-verify haproxy-configure haproxy-verify patroni-failover-test failure-baseline failure-scenario failure-matrix failure-report failure-clean durability-set durability-verify durability-latency durability-failure-test durability-standby-loss durability-strict-test durability-matrix durability-report durability-clean chaos-baseline chaos-scenario chaos-matrix chaos-report chaos-clean pgsafe-build pgsafe-test pgsafe-check pgsafe-fixtures migration-baseline migration-runtime-test migration-clean
 
 tf-fmt:
 	$(TERRAFORM) fmt -recursive terraform
@@ -126,3 +128,30 @@ chaos-report:
 
 chaos-clean:
 	rm -rf .pgsentry/results/m7
+
+pgsafe-build:
+	mkdir -p bin
+	go build -ldflags "-X main.version=m8" -o $(PGSAFE) ./cmd/pgsafe
+
+pgsafe-test:
+	go test ./...
+	go vet ./...
+
+pgsafe-check: pgsafe-build
+	$(PGSAFE) check $(FILE)
+
+pgsafe-fixtures: pgsafe-build
+	$(PGSAFE) check testdata/migrations/safe/staged.sql
+	@$(PGSAFE) check testdata/migrations/unsafe/risky.sql >/dev/null 2>&1; test $$? -eq 1
+	@$(PGSAFE) check testdata/migrations/edge/malformed.sql >/dev/null 2>&1; test $$? -eq 2
+	$(PGSAFE) check testdata/migrations/edge/suppressed.sql
+	$(PGSAFE) check testdata/migrations/edge/quoted.sql --format=json >/dev/null
+
+migration-baseline: check-profile
+	./scripts/migrations/baseline.sh $(PROFILE)
+
+migration-runtime-test: check-profile
+	./scripts/migrations/runtime-test.sh $(PROFILE)
+
+migration-clean: check-profile
+	./scripts/migrations/clean.sh $(PROFILE)
