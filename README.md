@@ -18,7 +18,7 @@ M1 provides VM infrastructure, M2 demonstrates manual PostgreSQL replication, M3
 | M6 | Synchronous durability experiments | Implemented and verified |
 | M7 | Network-partition and DCS chaos | Complete |
 | M8 | pgsafe migration safety CLI | Complete |
-| M9 | Backup, WAL, and PITR verification | Planned |
+| M9 | Backup, WAL, and PITR verification | Complete |
 | M10 | Observability, runbooks, and portfolio polish | Planned |
 
 ## Topologies
@@ -153,3 +153,16 @@ make pgsafe-build
 ```
 
 Static fixtures run in hosted CI with `make pgsafe-fixtures`. The explicitly named `make migration-runtime-test PROFILE=full` separately manipulates only disposable objects on the canonical local cluster. See [the M8 runbook](docs/m8-pgsafe.md) and [rule catalog](docs/pgsafe-rules.md).
+
+## M9 quick start
+
+M9 stores pgBackRest physical backups and archived WAL on `control-01`, then starts loopback-only recovery instances outside Patroni:
+
+```bash
+make backup-configure PROFILE=full
+make backup-check PROFILE=full
+make backup-acceptance PROFILE=full # intentionally DELETEs disposable M9 data
+make backup-clean PROFILE=full
+```
+
+The acceptance flow proves both post-backup WAL replay and PITR to a named restore point after replication has copied a DELETE to every live replica. See [the M9 runbook](docs/m9-backup-pitr.md).

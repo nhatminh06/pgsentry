@@ -76,3 +76,9 @@ Direct SQL observations sample all database members throughout each fault. More 
 `pgsafe` is a standalone, read-only Go CLI. SQL flows through the PostgreSQL 16 `libpg_query` parser, its AST is evaluated by deterministic rules, and diagnostics are rendered as text or JSON. The CLI has no database driver or execution path. GitHub-hosted CI runs only static build, test, fixture, and Terraform checks.
 
 Selected lock demonstrations are separate shell automation for the canonical full topology. They use a disposable `pgsafe_m8` schema, bounded PostgreSQL timeouts, the existing HAProxy client path, and ignored evidence under `.pgsentry/results/m8/`. Patroni continues to own PostgreSQL; M8 does not inject node, DCS, or network failures.
+
+## M9 backup and historical-recovery boundary
+
+M9 mounts a restricted NFSv4 pgBackRest repository physically hosted at `control-01:/var/lib/pgbackrest` on each Patroni member. Patroni's dynamic PostgreSQL configuration owns `archive_mode`, `archive_command`, and restart semantics; systemd still owns Patroni, and Patroni still owns every live PostgreSQL process. Backups dynamically use the current leader.
+
+Latest-state and PITR restores run outside Patroni on control-01 in fresh `/var/lib/pgbackrest-restore/*` directories. They bind only `127.0.0.1:55432`, use explicit `pg_ctl` lifecycle, never join the DCS, and never enter HAProxy. This off-PGDATA repository is operational separation inside one lab network, not geographic disaster recovery.
