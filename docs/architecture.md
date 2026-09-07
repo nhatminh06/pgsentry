@@ -64,3 +64,9 @@ The targeted DCS experiment blocks only the current database leader's etcd clien
 M6 leaves the seven-VM topology and stable HAProxy client path unchanged. It changes Patroni's dynamic cluster configuration among `async`, `sync`, and `sync-strict`, while Patroni remains the sole owner of `synchronous_standby_names` and synchronous failover eligibility. PostgreSQL uses `synchronous_commit=on`: a synchronous acknowledgement waits for the selected standby to flush WAL, not replay it.
 
 The same M5 sequenced workload measures healthy commit latency, failure interruption, ambiguous outcomes, and retained acknowledged rows. Non-strict synchronous mode may favor availability when no eligible synchronous standby exists; strict mode preserves the synchronous requirement and can therefore block writes. M6 is controlled evidence, not a universal zero-RPO guarantee.
+
+## M7 partition and DCS-chaos boundary
+
+M7 keeps the canonical topology, Patroni ownership, etcd mutual TLS, async default, and stable HAProxy write path. It introduces one bounded failure dimension at a time: DCS isolation of a database member, loss of etcd quorum, peer isolation of the elected etcd leader, or interruption of both replica WAL connections. Tagged guest-local firewall rules preserve SSH and unrelated ports and are removed exactly by cleanup traps.
+
+Direct SQL observations sample all database members throughout each fault. More than one writable PostgreSQL node is an immediate safety failure. These controlled partitions do not model arbitrary packet loss, delay, reordering, Byzantine behavior, or every asymmetric topology.

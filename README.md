@@ -16,7 +16,7 @@ M1 provides VM infrastructure, M2 demonstrates manual PostgreSQL replication, M3
 | M4 | Patroni HA and HAProxy routing | Implemented and verified |
 | M5 | Automated failure and durability harness | Implemented and verified |
 | M6 | Synchronous durability experiments | Implemented and verified |
-| M7 | Network-partition and DCS chaos | Planned |
+| M7 | Network-partition and DCS chaos | Complete |
 | M8 | pgsafe migration safety CLI | Planned |
 | M9 | Backup, WAL, and PITR verification | Planned |
 | M10 | Observability, runbooks, and portfolio polish | Planned |
@@ -125,3 +125,16 @@ make durability-report
 ```
 
 The default after experiments is restored to `async`. Strict mode deliberately blocks bounded client writes when no synchronous standby exists. See [the M6 runbook](docs/m6-synchronous-durability.md).
+
+## M7 quick start
+
+M7 extends the M5 safety and availability harness with bounded, tagged network partitions and DCS quorum experiments:
+
+```bash
+make chaos-baseline PROFILE=full
+make chaos-scenario PROFILE=full CHAOS_SCENARIO=replica-dcs-isolation
+make chaos-matrix PROFILE=full
+make chaos-report
+```
+
+Every scenario is destructive but self-restoring. Normal writes remain on the same HAProxy endpoint, and direct SQL sampling fails immediately if more than one writable primary is observed. See [the M7 runbook](docs/m7-network-dcs-chaos.md).
