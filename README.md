@@ -17,7 +17,7 @@ M1 provides VM infrastructure, M2 demonstrates manual PostgreSQL replication, M3
 | M5 | Automated failure and durability harness | Implemented and verified |
 | M6 | Synchronous durability experiments | Implemented and verified |
 | M7 | Network-partition and DCS chaos | Complete |
-| M8 | pgsafe migration safety CLI | Planned |
+| M8 | pgsafe migration safety CLI | Complete |
 | M9 | Backup, WAL, and PITR verification | Planned |
 | M10 | Observability, runbooks, and portfolio polish | Planned |
 
@@ -138,3 +138,18 @@ make chaos-report
 ```
 
 Every scenario is destructive but self-restoring. Normal writes remain on the same HAProxy endpoint, and direct SQL sampling fails immediately if more than one writable primary is observed. See [the M7 runbook](docs/m7-network-dcs-chaos.md).
+
+## M8 quick start
+
+`pgsafe` statically analyzes PostgreSQL 16 migration SQL and never connects to or executes against a database:
+
+```bash
+make pgsafe-build
+./bin/pgsafe check migration.sql
+./bin/pgsafe check migration.sql --format=json --fail-on=high
+./bin/pgsafe check migration.sql --transaction-mode=wrapped
+./bin/pgsafe rules
+./bin/pgsafe explain PGSAFE001
+```
+
+Static fixtures run in hosted CI with `make pgsafe-fixtures`. The explicitly named `make migration-runtime-test PROFILE=full` separately manipulates only disposable objects on the canonical local cluster. See [the M8 runbook](docs/m8-pgsafe.md) and [rule catalog](docs/pgsafe-rules.md).

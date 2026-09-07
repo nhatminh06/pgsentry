@@ -1,0 +1,28 @@
+name: static-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: hashicorp/setup-terraform@v3
+      - name: Go formatting
+        run: test -z "$(gofmt -l cmd internal)"
+      - name: Go tests and vet
+        run: make pgsafe-test
+      - name: Build and static acceptance fixtures
+        run: make pgsafe-fixtures
+      - name: Terraform formatting and validation
+        run: make tf-validate

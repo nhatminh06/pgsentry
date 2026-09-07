@@ -1,0 +1,17 @@
+CREATE INDEX idx_orders_customer ON public.orders(customer_id);
+BEGIN;
+CREATE INDEX CONCURRENTLY idx_orders_created ON public.orders(created_at);
+COMMIT;
+ALTER TABLE public.orders ALTER COLUMN total TYPE numeric(20,2);
+ALTER TABLE public.orders ALTER COLUMN customer_id SET NOT NULL;
+ALTER TABLE public.orders ADD CONSTRAINT total_positive CHECK (total >= 0);
+ALTER TABLE public.orders ADD CONSTRAINT orders_customer_fk FOREIGN KEY (customer_id) REFERENCES public.customers(id);
+ALTER TABLE public.orders DROP COLUMN legacy_code;
+ALTER TABLE public.orders ADD COLUMN generated_at timestamptz DEFAULT clock_timestamp();
+DROP INDEX idx_orders_old;
+DROP TABLE public.old_orders;
+TRUNCATE public.orders;
+DELETE FROM public.orders;
+UPDATE public.orders SET status = 'cancelled';
+VACUUM FULL public.orders;
+REINDEX TABLE public.orders;
