@@ -2,11 +2,12 @@ PROFILE ?= colocated
 SCENARIO ?= primary-service-loss
 TRIAL ?= 1
 MODE ?= async
+CHAOS_SCENARIO ?= primary-dcs-isolation
 TERRAFORM ?= terraform
 TF_DIR := terraform/environments/$(PROFILE)
 VALID_PROFILES := full colocated
 
-.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean etcd-configure etcd-verify etcd-quorum-test etcd-clean patroni-configure patroni-verify haproxy-configure haproxy-verify patroni-failover-test failure-baseline failure-scenario failure-matrix failure-report failure-clean durability-set durability-verify durability-latency durability-failure-test durability-standby-loss durability-strict-test durability-matrix durability-report durability-clean
+.PHONY: tf-fmt tf-validate cluster-up cluster-down check-profile pg-configure pg-verify pg-failover pg-clean etcd-configure etcd-verify etcd-quorum-test etcd-clean patroni-configure patroni-verify haproxy-configure haproxy-verify patroni-failover-test failure-baseline failure-scenario failure-matrix failure-report failure-clean durability-set durability-verify durability-latency durability-failure-test durability-standby-loss durability-strict-test durability-matrix durability-report durability-clean chaos-baseline chaos-scenario chaos-matrix chaos-report chaos-clean
 
 tf-fmt:
 	$(TERRAFORM) fmt -recursive terraform
@@ -110,3 +111,18 @@ durability-report:
 
 durability-clean:
 	rm -rf .pgsentry/results/m6
+
+chaos-baseline: check-profile
+	./scripts/chaos/baseline.sh $(PROFILE)
+
+chaos-scenario: check-profile
+	./scripts/chaos/scenario.sh $(PROFILE) $(CHAOS_SCENARIO) $(TRIAL)
+
+chaos-matrix: check-profile
+	./scripts/chaos/run-matrix.sh $(PROFILE)
+
+chaos-report:
+	python3 scripts/chaos/report.py .pgsentry/results/m7
+
+chaos-clean:
+	rm -rf .pgsentry/results/m7
